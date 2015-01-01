@@ -74,7 +74,7 @@ while true ; do
   
   # Send report
   if [[ $fileIndex == $reportInterval ]] ; then
-    report="Report of $reportInterval snapshots (snapshot interval $crawlInterval sec):\n\n"
+    report="Report of $reportInterval snapshots (snapshot interval $crawlInterval min):\n\n"
     while read -r url ; do
       totalLoadTime=0
       filenamePre="${tmpDir}/url_$( getMd5 "$url" )"
