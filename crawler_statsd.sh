@@ -85,7 +85,7 @@ while true ; do
       report+="$( head -n 1 "$filenamePre"_1 )\n"
       report+="Average load time: $(( totalLoadTime / reportInterval )) sec\n"
       report+="Changes:\n"
-      report+="$( diff "$filenamePre"_1 "$filenamePre"_"$reportInterval" | grep '^[<>]' )"
+      report+="$( diff "$filenamePre"_1 "$filenamePre"_"$reportInterval" | grep '^[<>]' )\n"
     done < "$urlsFile"
     echo -e "$report"
   fi
