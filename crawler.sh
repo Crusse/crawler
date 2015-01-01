@@ -55,7 +55,7 @@ getServerData() {
   fi
   local serverData=$( wget -T7 -qO - "http://ip-api.com/line/${ip}?fields=status,country,city,isp,query" )
   if [[ "$( head -n1 <<< "$serverData" )" != 'success' ]]; then
-    echo "ip geolocation for $1 failed with status '$status'"
+    echo "ip geolocation for $1 failed"
     exit 2
   fi
 

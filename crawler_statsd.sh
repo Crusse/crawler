@@ -7,6 +7,7 @@ printUsage() {
   echo "  -i  Crawl interval, in minutes. How often to fetch each site."
   echo "  -r  Reporting interval, in number of crawls. Setting this to 1 sends"
   echo "      a report each time the websites are crawled."
+  echo "  -e  Email address to send reports to."
 }
 
 if [[ $# < 1 ]] ; then
@@ -22,14 +23,16 @@ while getopts "$validOpts" opt ; do
   fi
 done
 
-crawlInterval=$(( 60 * 60 ))
+crawlInterval=60
 reportInterval=24
+email=""
 
 OPTIND=1
 while getopts "$validOpts" opt ; do
   case "$opt" in
     i) crawlInterval=$OPTARG;;
-    r) reportingInterval=$OPTARG;;
+    r) reportInterval=$OPTARG;;
+    e) email="$OPTARG";;
     :) echo "Option -$OPTARG requires an argument"
        exit 1;;
   esac
@@ -64,22 +67,30 @@ trap "rm -rf "$tmpDir";exit 0;" EXIT INT TERM
 fileIndex=1
 
 while true ; do
-
+  
   while read -r url ; do
     ./crawler.sh "$url" > "${tmpDir}/url_$( getMd5 "$url" )_$fileIndex"
   done < "$urlsFile"
   
   # Send report
   if [[ $fileIndex == $reportInterval ]] ; then
+    report="Report of $reportInterval snapshots (snapshot interval $crawlInterval sec):\n\n"
     while read -r url ; do
+      totalLoadTime=0
+      filenamePre="${tmpDir}/url_$( getMd5 "$url" )"
       for i in $( seq 1 $reportInterval ) ; do
-        filename="${tmpDir}/url$( getMd5 "$url" )_$i"
+        filename="${filenamePre}_${i}"
+        totalLoadTime=$(( totalLoadTime + $( grep "Download speed:" "$filename" | sed -r 's/[^[:digit:]]+//g' ) ))
       done
+      report+="$( head -n 1 "$filenamePre"_1 )\n"
+      report+="Average load time: $(( totalLoadTime / reportInterval )) sec\n"
+      report+="Changes:\n"
+      report+="$( diff "$filenamePre"_1 "$filenamePre"_"$reportInterval" | grep '^[<>]' )"
     done < "$urlsFile"
-    lastReportTime=$now
+    echo -e "$report"
   fi
   
-  sleep $crawlInterval
+  sleep $(( crawlInterval * 60 ))
   fileIndex=$(( fileIndex + 1 ))
   if [[ $fileIndex > $reportInterval ]] ; then
     rm -f "$tmpDir"/url_*
