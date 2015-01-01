@@ -1,6 +1,6 @@
 #/bin/bash
 
-validOpts=':i:r:'
+validOpts=':i:r:e:'
 
 printUsage() {
   echo "Usage: $( basename "$0" ) [OPTIONS] <input file>"
@@ -63,31 +63,56 @@ if [[ $? != 0 ]]; then
   exit 2
 fi
 
-trap "rm -rf "$tmpDir";exit 0;" EXIT INT TERM
+trap "rm -rf "$tmpDir";exit 0;" INT TERM
 fileIndex=1
 
 while true ; do
   
   while read -r url ; do
     ./crawler.sh "$url" > "${tmpDir}/url_$( getMd5 "$url" )_$fileIndex"
+    if [[ $? != 0 ]] ; then
+      rm -f "${tmpDir}/url_$( getMd5 "$url" )_$fileIndex"
+    fi
   done < "$urlsFile"
   
   # Send report
   if [[ $fileIndex == $reportInterval ]] ; then
-    report="Report of $reportInterval snapshots (snapshot interval $crawlInterval min):\n\n"
+
+    report="Report of $reportInterval snapshots for each URL (snapshot interval $crawlInterval min):\n\n"
+
     while read -r url ; do
-      totalLoadTime=0
+
       filenamePre="${tmpDir}/url_$( getMd5 "$url" )"
-      for i in $( seq 1 $reportInterval ) ; do
-        filename="${filenamePre}_${i}"
-        totalLoadTime=$(( totalLoadTime + $( grep "Download speed:" "$filename" | sed -r 's/[^[:digit:]]+//g' ) ))
-      done
-      report+="$( head -n 1 "$filenamePre"_1 )\n"
-      report+="Average load time: $(( totalLoadTime / reportInterval )) sec\n"
-      report+="Changes:\n"
-      report+="$( diff "$filenamePre"_1 "$filenamePre"_"$reportInterval" | grep '^[<>]' )\n"
+
+      # If this URL couldn't be downloaded, don't include it in the report
+      if [[ ! -e "$filenamePre"_1 ]] ; then
+        continue
+      fi
+
+      if [[ $reportInterval < 2 ]] ; then
+        report+="$( cat "$filenamePre"_1 )\n\n"
+      else
+        totalLoadTime=0
+        maxLoadTime=0
+        for i in $( seq 1 $reportInterval ) ; do
+          filename="${filenamePre}_${i}"
+          loadTime=$( grep "Download speed:" "$filename" | sed -r 's/[^[:digit:]]+//g' )
+          totalLoadTime=$(( totalLoadTime + loadTime ))
+          if [[ $loadTime > $maxLoadTime ]] ; then maxLoadTime=$loadTime; fi
+        done
+        report+="$( head -n 1 "$filenamePre"_1 )\n"
+        report+="Average load time: $(( totalLoadTime / reportInterval )) sec\n"
+        report+="Slowest load time: $maxLoadTime sec\n"
+        report+="Changes:\n"
+        report+="$( diff "$filenamePre"_1 "$filenamePre"_"$reportInterval" | grep -P '^[<>](?! Download)' )\n\n"
+      fi
     done < "$urlsFile"
-    echo -e "$report"
+    if [[ "$email" ]] ; then
+      echo -e "$report" | mail -s "Crawler report $( date )" "$email"
+      echo "Report sent to $email"
+    else
+      echo -e "$report"
+    fi
   fi
   
   sleep $(( crawlInterval * 60 ))
@@ -98,5 +123,6 @@ while true ; do
   fi
 done
 
+rm -rf "$tmpDir"
 exit 0
 

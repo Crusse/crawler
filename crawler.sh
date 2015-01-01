@@ -12,7 +12,7 @@ if [[ $? != 0 ]]; then
   exit 2
 fi
 
-trap "rm -rf "$tmpDir";exit 0" EXIT INT TERM
+trap "rm -rf "$tmpDir";exit 0" INT TERM
 
 stripTags() {
   echo "$1" | sed -r 's/<[^>]+?>//g'
@@ -55,7 +55,7 @@ getServerData() {
   fi
   local serverData=$( wget -T7 -qO - "http://ip-api.com/line/${ip}?fields=status,country,city,isp,query" )
   if [[ "$( head -n1 <<< "$serverData" )" != 'success' ]]; then
-    echo "ip geolocation for $1 failed"
+    echo "ip geolocation for $1 failed" 1>&2
     exit 2
   fi
 
@@ -79,7 +79,7 @@ for url in "$@" ; do
     echo "Error: could not download $url" 1>&2
     # Clean up
     rm -f "$tmpFile"
-    continue
+    exit 1
   fi
 
   dlSpeed=$(( $( date +%s ) - startTime ))
@@ -108,6 +108,7 @@ for url in "$@" ; do
   rm -f "$tmpFile"
 done
 
+rm -rf "$tmpDir"
 exit 0
 
 
