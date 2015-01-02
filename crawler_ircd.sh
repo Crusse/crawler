@@ -1,18 +1,19 @@
 #!/bin/bash
 
-URLSFILE="$( dirname "$0" )/irc_urls"
 PRIVMSG_MAX_LINES=5
-validOpts=':c:n:spe:'
+validOpts=':c:n:spe:u:'
 
 printUsage() {
   echo "Usage: $( basename "$0" ) [OPTIONS] addr port"
   echo "Options:"
-  echo "  -c  Channels. Separate each channel with a space. (optional)"
-  echo "  -n  Nickname. (optional)"
-  echo "  -s  Use SSL. (optional)"
+  echo "  -c  Channels. Separate each channel with a space."
+  echo "  -n  Nickname."
+  echo "  -s  Use SSL."
   echo "  -p  Use password. This is a flag -- you will be prompted for a "
-  echo "      password. (optional)"
+  echo "      password."
   echo "  -e  Output to this email address."
+  echo "  -u  The file to use for storing stats collector URLs. The file will"
+  echo "      be created if it does not exist."
 }
 
 if [[ $# = 0 ]] ; then
@@ -46,6 +47,7 @@ while getopts "$validOpts" opt; do
     c) channels="$OPTARG";;
     n) nick="$OPTARG";;
     e) email="$OPTARG";;
+    u) urlsPath="$OPTARG";;
     :) echo "Option -$OPTARG requires an argument"
        exit 1;;
   esac
@@ -63,15 +65,17 @@ elif [[ ! "$port" ]] ; then
   exit 1
 fi
 
-if [[ ! -x "$( dirname "$URLSFILE" )" ]] ; then
-  mkdir "$( dirname "$URLSFILE" )"
-fi
-if [[ ! -x "$URLSFILE" ]] ; then
-  touch "$URLSFILE"
-fi
-if [[ ! -w "$URLSFILE" ]] ; then
-  echo "$URLSFILE is not writable"
-  exit 1
+if [[ "$urlsPath" ]] ; then
+  if [[ ! -x "$( dirname "$urlsPath" )" ]] ; then
+    mkdir "$( dirname "$urlsPath" )"
+  fi
+  if [[ ! -x "$urlsPath" ]] ; then
+    touch "$urlsPath"
+  fi
+  if [[ ! -w "$urlsPath" ]] ; then
+    echo "$urlsPath is not writable"
+    exit 1
+  fi
 fi
 
 getMd5() {
@@ -128,25 +132,26 @@ handlePrivMsg() {
         if [[ $? != 0 ]] ; then return 1; fi
         ;;
       !addurl)
-        if [[ ! "$arg" ]] ; then return 1; fi
-        if [[ ! $( grep -F "$arg" "$URLSFILE" ) ]] ; then
-          echo "$arg" >> "$URLSFILE"
+        if [[ ! "$urlsPath" || ! "$arg" ]] ; then return 1; fi
+        if [[ ! $( grep -F "$arg" "$urlsPath" ) ]] ; then
+          echo "$arg" >> "$urlsPath"
           ircOut="Added $arg to crawler stats collector"
         else
           ircOut="$arg already exists in the crawler stats collector"
         fi
         ;;
       !removeurl)
-        if [[ ! "$arg" ]] ; then return 1; fi
-        if [[ $( grep -F "$arg" "$URLSFILE" ) ]] ; then
-          sed -ir '\|^'"$arg"'$|d' "$URLSFILE"
+        if [[ ! "$urlsPath" || ! "$arg" ]] ; then return 1; fi
+        if [[ $( grep -F "$arg" "$urlsPath" ) ]] ; then
+          sed -ir '\|^'"$arg"'$|d' "$urlsPath"
           ircOut="Removed $arg from the crawler stats collector"
         else
           ircOut="$arg was not found in the crawler stats collector"
         fi
         ;;
       !listurls)
-        ircOut=$( cat "$URLSFILE" )
+        if [[ ! "$urlsPath" ]] ; then return 1; fi
+        ircOut=$( cat "$urlsPath" )
     esac
     
     if (( $( wc -l <<< "$ircOut" ) > PRIVMSG_MAX_LINES )) && [[ "$email" ]] ; then
