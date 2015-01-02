@@ -51,11 +51,13 @@ getServerData() {
   local ip=$( dig +short "$domain" | head -n 1 )
   if [[ ! $ip ]]; then
     echo "Could not get ip for $domain" 1>&2
+    rm -rf "$tmpDir"
     exit 1
   fi
   local serverData=$( wget -T7 -qO - "http://ip-api.com/line/${ip}?fields=status,country,city,isp,query" )
   if [[ "$( head -n1 <<< "$serverData" )" != 'success' ]]; then
     echo "ip geolocation for $1 failed" 1>&2
+    rm -rf "$tmpDir"
     exit 2
   fi
 
@@ -79,6 +81,7 @@ for url in "$@" ; do
     echo "Error: could not download $url" 1>&2
     # Clean up
     rm -f "$tmpFile"
+    rm -rf "$tmpDir"
     exit 1
   fi
 

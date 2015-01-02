@@ -10,7 +10,7 @@ printUsage() {
   echo "  -e  Email address to send reports to."
 }
 
-if [[ $# < 1 ]] ; then
+if [[ $# == 1 ]] ; then
   printUsage
   exit 1
 fi
@@ -40,8 +40,8 @@ done
 
 shift $(( OPTIND - 1 ))
 
-if [[ $crawlInterval < 1 ]] ; then echo "Crawl interval (-i) must be larger than 0"; exit 1; fi
-if [[ $reportInterval < 1 ]] ; then echo "Reporting interval (-r) must be larger than 0"; exit 1; fi
+if (( $crawlInterval < 1 )) ; then echo "Crawl interval (-i) must be larger than 0"; exit 1; fi
+if (( $reportInterval < 1 )) ; then echo "Reporting interval (-r) must be larger than 0"; exit 1; fi
 
 urlsFile="$1"
 if [[ ! -f "$urlsFile" ]] ; then
@@ -89,7 +89,7 @@ while true ; do
         continue
       fi
 
-      if [[ $reportInterval < 2 ]] ; then
+      if (( $reportInterval < 2 )) ; then
         report+="$( cat "$filenamePre"_1 )\n\n"
       else
         totalLoadTime=0
@@ -98,7 +98,7 @@ while true ; do
           filename="${filenamePre}_${i}"
           loadTime=$( grep "Download speed:" "$filename" | sed -r 's/[^[:digit:]]+//g' )
           totalLoadTime=$(( totalLoadTime + loadTime ))
-          if [[ $loadTime > $maxLoadTime ]] ; then maxLoadTime=$loadTime; fi
+          if (( $loadTime > $maxLoadTime )) ; then maxLoadTime=$loadTime; fi
         done
         report+="$( head -n 1 "$filenamePre"_1 )\n"
         report+="Average load time: $(( totalLoadTime / reportInterval )) sec\n"
@@ -117,7 +117,7 @@ while true ; do
   
   sleep $(( crawlInterval * 60 ))
   fileIndex=$(( fileIndex + 1 ))
-  if [[ $fileIndex > $reportInterval ]] ; then
+  if (( $fileIndex > $reportInterval )) ; then
     rm -f "$tmpDir"/url_*
     fileIndex=1
   fi
