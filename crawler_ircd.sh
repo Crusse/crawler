@@ -1,6 +1,8 @@
 #!/bin/bash
 
-validOpts=':c:n:spf'
+URLSFILE="$( dirname "$0" )/irc_urls"
+PRIVMSG_MAX_LINES=5
+validOpts=':c:n:spe:'
 
 printUsage() {
   echo "Usage: $( basename "$0" ) [OPTIONS] addr port"
@@ -10,7 +12,13 @@ printUsage() {
   echo "  -s  Use SSL. (optional)"
   echo "  -p  Use password. This is a flag -- you will be prompted for a "
   echo "      password. (optional)"
+  echo "  -e  Output to this email address."
 }
+
+if [[ $# = 0 ]] ; then
+  printUsage
+  exit 1
+fi
 
 # Validate args
 OPTIND=1
@@ -26,6 +34,7 @@ password=""
 usePassword=""
 nick="Crawler"
 channels=""
+email=""
 
 OPTIND=1
 while getopts "$validOpts" opt; do
@@ -36,6 +45,7 @@ while getopts "$validOpts" opt; do
        read -sr password;;
     c) channels="$OPTARG";;
     n) nick="$OPTARG";;
+    e) email="$OPTARG";;
     :) echo "Option -$OPTARG requires an argument"
        exit 1;;
   esac
@@ -50,6 +60,17 @@ if [[ ! "$server" ]] ; then
   exit 1
 elif [[ ! "$port" ]] ; then
   echo "No port given." 1>&2
+  exit 1
+fi
+
+if [[ ! -x "$( dirname "$URLSFILE" )" ]] ; then
+  mkdir "$( dirname "$URLSFILE" )"
+fi
+if [[ ! -x "$URLSFILE" ]] ; then
+  touch "$URLSFILE"
+fi
+if [[ ! -w "$URLSFILE" ]] ; then
+  echo "$URLSFILE is not writable"
   exit 1
 fi
 
@@ -97,17 +118,45 @@ handlePrivMsg() {
 
     if [[ "$dest" =~ ^# ]] ; then local sendTo="$dest"
     else local sendTo="$src"; fi
+    
+    local ircOut=""
 
-    local crawlOut=""
     case $cmd in
       !crawl)
-        local crawlOut=$( ./crawler.sh "$arg" 2>&1 )
+        if [[ ! "$arg" ]] ; then return 1; fi
+        ircOut=$( ./crawler.sh "$arg" )
+        if [[ $? != 0 ]] ; then return 1; fi
         ;;
+      !addurl)
+        if [[ ! "$arg" ]] ; then return 1; fi
+        if [[ ! $( grep -F "$arg" "$URLSFILE" ) ]] ; then
+          echo "$arg" >> "$URLSFILE"
+          ircOut="Added $arg to crawler stats collector"
+        else
+          ircOut="$arg already exists in the crawler stats collector"
+        fi
+        ;;
+      !removeurl)
+        if [[ ! "$arg" ]] ; then return 1; fi
+        if [[ $( grep -F "$arg" "$URLSFILE" ) ]] ; then
+          sed -ir '\|^'"$arg"'$|d' "$URLSFILE"
+          ircOut="Removed $arg from the crawler stats collector"
+        else
+          ircOut="$arg was not found in the crawler stats collector"
+        fi
+        ;;
+      !listurls)
+        ircOut=$( cat "$URLSFILE" )
     esac
     
-    while read -r line ; do
-      echo "PRIVMSG $sendTo :$line" >> "$configPath"
-    done <<< "$crawlOut"
+    if (( $( wc -l <<< "$ircOut" ) > PRIVMSG_MAX_LINES )) && [[ "$email" ]] ; then
+      echo -e "$ircOut" | mail -s "Crawler results $arg" "$email"
+      echo "PRIVMSG $sendTo :Result has more than $PRIVMSG_MAX_LINES lines; sent an email to $email" >> "$configPath"
+    else
+      while read -r line ; do
+        echo "PRIVMSG $sendTo :$line" >> "$configPath"
+      done <<< "$ircOut"
+    fi
   fi
 }
 

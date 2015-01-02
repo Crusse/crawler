@@ -10,7 +10,7 @@ printUsage() {
   echo "  -e  Email address to send reports to."
 }
 
-if [[ $# == 1 ]] ; then
+if [[ $# == 0 ]] ; then
   printUsage
   exit 1
 fi
@@ -104,7 +104,8 @@ while true ; do
         report+="Average load time: $(( totalLoadTime / reportInterval )) sec\n"
         report+="Slowest load time: $maxLoadTime sec\n"
         report+="Changes:\n"
-        report+="$( diff "$filenamePre"_1 "$filenamePre"_"$reportInterval" | grep -P '^[<>](?! Download)' )\n\n"
+        report+="$( diff "$filenamePre"_1 "$filenamePre"_"$reportInterval" | \
+          grep -P '^[<>](?! Download)' | sed -r 's/^</old/g' | sed -r 's/^>/NEW/g' )\n\n"
       fi
     done < "$urlsFile"
     if [[ "$email" ]] ; then
