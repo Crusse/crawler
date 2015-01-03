@@ -102,7 +102,8 @@ trap "rm -f $configPath;exit 0" INT TERM EXIT
 
 handleServerMsg() {
   case "$1" in
-    PING*) echo "PONG${1#PING}" >> $configPath;;
+    PING*) echo "PONG${1#PING}" >> $configPath
+      echo "${1}";;
     *QUIT*) ;;
     *PART*) ;;
     *JOIN*) ;;
@@ -172,7 +173,7 @@ cleanUpAfterConnInit() {
   connInited=1
 }
 
-if [[ $useSsl || $useFlowdock ]] ; then
+if [[ $useSsl ]] ; then
   echo "Connecting to $server:$port with openssl s_client"
   tail -F "$configPath" | openssl s_client -connect "$server:$port" | while read -r msg ; do
     if [[ ! "$connInited" ]] ; then cleanUpAfterConnInit; fi
