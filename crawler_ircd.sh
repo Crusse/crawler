@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PRIVMSG_MAX_LINES=5
-validOpts=':c:n:spe:u:'
+validOpts=':c:n:spe:u:f'
 
 printUsage() {
   echo "Usage: $( basename "$0" ) [OPTIONS] addr port"
@@ -14,6 +14,7 @@ printUsage() {
   echo "  -e  Output to this email address."
   echo "  -u  The file to use for storing stats collector URLs. The file will"
   echo "      be created if it does not exist."
+  echo "  -f  Flowdock mode."
 }
 
 if [[ $# = 0 ]] ; then
@@ -36,6 +37,7 @@ usePassword=""
 nick="Crawler"
 channels=""
 email=""
+flowdock=""
 
 OPTIND=1
 while getopts "$validOpts" opt; do
@@ -48,6 +50,7 @@ while getopts "$validOpts" opt; do
     n) nick="$OPTARG";;
     e) email="$OPTARG";;
     u) urlsPath="$OPTARG";;
+    f) flowdock=1;;
     :) echo "Option -$OPTARG requires an argument"
        exit 1;;
   esac
@@ -66,10 +69,10 @@ elif [[ ! "$port" ]] ; then
 fi
 
 if [[ "$urlsPath" ]] ; then
-  if [[ ! -x "$( dirname "$urlsPath" )" ]] ; then
+  if [[ ! -e "$( dirname "$urlsPath" )" ]] ; then
     mkdir "$( dirname "$urlsPath" )"
   fi
-  if [[ ! -x "$urlsPath" ]] ; then
+  if [[ ! -e "$urlsPath" ]] ; then
     touch "$urlsPath"
   fi
   if [[ ! -w "$urlsPath" ]] ; then
@@ -104,6 +107,7 @@ handleServerMsg() {
   case "$1" in
     PING*) echo "PONG${1#PING}" >> $configPath
       echo "${1}";;
+    PONG*) echo "PONG $( date "+%D %T" )";;
     *QUIT*) ;;
     *PART*) ;;
     *JOIN*) ;;
@@ -170,6 +174,20 @@ connInited=""
 cleanUpAfterConnInit() {
   # truncate the command input file, so that it doesn't include plain pwds etc.
   > "$configPath"
+  if [[ $flowdock ]] ; then
+    # Flowdock doesn't seem to PING us periodically, so we try to keep the
+    # connection up by PINGing the server.
+    ( while true ; do
+        sleep 60
+        if [[ ! -e "$configPath" ]] ; then
+          exit 0
+        fi
+        echo "PING irc.flowdock.com" >> "$configPath"
+      done ) &
+    # Kill the pinging child process when this IRC daemon exits
+    pingPid=$!
+    trap "echo \"Killing ping process\"; kill $pingPid" EXIT HUP TERM INT
+  fi
   connInited=1
 }
 
