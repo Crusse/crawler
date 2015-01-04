@@ -30,7 +30,7 @@ printKeyValElems() {
   local sedKeyRegex=$keyRegex$q"([^\"']*?)"$q
   local valRegex='(content|href|src)='$q"([^\"']*)"$q
   
-  grep -Pzo '<'$tagName'\s[^<>]*('$grepKeyRegex'[^<>]*'$valRegex'|'$valRegex'[^<>]*'$grepKeyRegex')[^<>]*>' "$file" | \
+  grep -Pzoa '<'$tagName'\s[^<>]*('$grepKeyRegex'[^<>]*'$valRegex'|'$valRegex'[^<>]*'$grepKeyRegex')[^<>]*>' "$file" | \
     tr '\r\n' ' ' | \
     sed -r 's/<'$tagName'\s[^<>]*('$sedKeyRegex'[^<>]*'$valRegex'|'$valRegex'[^<>]*'$sedKeyRegex')[^<>]*>/[meta \3\9] \5\7\n/g' | \
     # trim spaces
@@ -90,20 +90,20 @@ for url in "$@" ; do
   echo "========== $url =========="
   echo "Download size: $(( $( wc -c < "$tmpFile" ) / 1000 )) KB"
   echo "Download speed: $dlSpeed sec"
-  echo '[title]' $( stripTags "$( grep -Pzo '<title[^>]*>([^<>]*)</title>' "$tmpFile" )" )
+  echo '[title]' $( stripTags "$( grep -Pzoa '<title[^>]*>([^<>]*)</title>' "$tmpFile" )" )
   printKeyValElems "$tmpFile" meta '(description|keywords)'
   printKeyValElems "$tmpFile" meta 'og:[^"'"'"']*'
   printKeyValElems "$tmpFile" link '(canonical|next|alternate)'
   
   q="['\"]"
-  linkElemCount=$( grep -Pzo '<link\s[^>]*rel='"$q"'stylesheet'"$q" "$tmpFile" | grep -Pc '<link' )
-  scriptElemCount=$( grep -Pzo '<script\s[^>]*src=' "$tmpFile" | grep -Pc '<script' )
+  linkElemCount=$( grep -Pzoa '<link\s[^>]*rel='"$q"'stylesheet'"$q" "$tmpFile" | grep -Pca '<link' )
+  scriptElemCount=$( grep -Pzoa '<script\s[^>]*src=' "$tmpFile" | grep -Pca '<script' )
   echo "CSS <link>s: $linkElemCount"
   echo "<script>s with src: $scriptElemCount"
   
   echo "$wgetResult" | \
     sed -r 's/^[[:space:]]+|[[:space:]]+$//g' | \
-    grep -Pi '^(cache-control|wp-super-cache|server:|content-type|expires)'
+    grep -Pia '^(cache-control|wp-super-cache|server:|content-type|expires)'
   getServerData "$url"
   echo
 

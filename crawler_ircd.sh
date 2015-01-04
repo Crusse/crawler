@@ -1,6 +1,7 @@
 #!/bin/bash
 
 PRIVMSG_MAX_LINES=5
+PING_INTERVAL=240
 validOpts=':c:n:spe:u:f'
 
 printUsage() {
@@ -107,7 +108,7 @@ handleServerMsg() {
   case "$1" in
     PING*) echo "PONG${1#PING}" >> $configPath
       echo "${1}";;
-    PONG*) echo "PONG $( date "+%D %T" )";;
+    *PONG*) ;;
     *QUIT*) ;;
     *PART*) ;;
     *JOIN*) ;;
@@ -177,12 +178,13 @@ cleanUpAfterConnInit() {
   if [[ $flowdock ]] ; then
     # Flowdock doesn't seem to PING us periodically, so we try to keep the
     # connection up by PINGing the server.
+    pingOrigin="${nick}-${RANDOM}-keepalive"
     ( while true ; do
-        sleep 60
+        sleep $PING_INTERVAL
         if [[ ! -e "$configPath" ]] ; then
           exit 0
         fi
-        echo "PING irc.flowdock.com" >> "$configPath"
+        echo "PING $pingOrigin" >> "$configPath"
       done ) &
     # Kill the pinging child process when this IRC daemon exits
     pingPid=$!
