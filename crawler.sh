@@ -54,7 +54,7 @@ getServerData() {
     rm -rf "$tmpDir"
     exit 1
   fi
-  local serverData=$( wget -T7 -qO - "http://ip-api.com/line/${ip}?fields=status,country,city,isp,query" )
+  local serverData=$( wget -T7 --tries 3 --ignore-length -qO - "http://ip-api.com/line/${ip}?fields=status,country,city,isp,query" )
   if [[ "$( head -n1 <<< "$serverData" )" != 'success' ]]; then
     echo "ip geolocation for $1 failed" 1>&2
     rm -rf "$tmpDir"
@@ -73,7 +73,7 @@ for url in "$@" ; do
   tmpFile="${tmpDir}/${urlMd5}.html"
   startTime=$( date +%s )
 
-  wgetResult="$( wget --header='Accept: text/html' \
+  wgetResult="$( wget --tries 3 --ignore-length --timeout 60 --header='Accept: text/html' \
     --user-agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:21.0) Gecko/20100101 Firefox/21.0' \
     -qS -O "$tmpFile" "$url" 2>&1 )"
   
